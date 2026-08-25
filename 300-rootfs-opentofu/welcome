@@ -1,0 +1,55 @@
+Welcome to the OpenTofu + Google Cloud CLI Playground!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Tools installed:
+   tofu        OpenTofu (open-source Terraform fork)
+   gcloud      Google Cloud CLI
+   gsutil      Google Cloud Storage tool
+   bq          BigQuery CLI
+   gke-gcloud-auth-plugin   GKE cluster auth
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Quick start:
+
+   tofu version
+   gcloud version
+
+ Authenticate with Google Cloud:
+
+   gcloud auth login
+   gcloud auth application-default login
+   gcloud config set project PROJECT_ID
+
+ Connect to a GKE cluster:
+
+   gcloud container clusters get-credentials CLUSTER --zone ZONE
+
+ First OpenTofu config:
+
+   mkdir my-infra && cd my-infra
+   cat > main.tf <<'EOF'
+   terraform {
+     required_providers {
+       google = {
+         source  = "registry.opentofu.org/hashicorp/google"
+         version = "~> 5.0"
+       }
+     }
+   }
+   provider "google" {
+     project = "YOUR_PROJECT_ID"
+     region  = "us-central1"
+   }
+   EOF
+   tofu init
+   tofu plan
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Docs:
+   OpenTofu   →  https://opentofu.org/docs/
+   GCloud     →  https://cloud.google.com/sdk/docs
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
