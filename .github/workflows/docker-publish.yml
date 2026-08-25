@@ -1,0 +1,107 @@
+# .github/workflows/docker-publish.yml
+
+name: Docker Build, Scan & Push
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/opentofu-gcloud-playground
+
+jobs:
+  build-scan-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    outputs:
+      image-digest: ${{ steps.build-push.outputs.digest }}
+      short-sha: ${{ steps.short-sha.outputs.value }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute short SHA
+        id: short-sha
+        run: echo "value=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Build locally for scan ────────────────────────────────────────────────
+      - name: Build image (local, for scan)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./300-rootfs-opentofu
+          file: ./300-rootfs-opentofu/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-${{ steps.short-sha.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Trivy scan ───────────────────────────────────────────────────────────
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-${{ steps.short-sha.outputs.value }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+      # ── Build & push ─────────────────────────────────────────────────────────
+      - name: Build and push
+        id: build-push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./300-rootfs-opentofu
+          file: ./300-rootfs-opentofu/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.short-sha.outputs.value }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Summary ──────────────────────────────────────────────────────────────
+      - name: Job summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "### Image pushed" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| latest | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| sha | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.short-sha.outputs.value }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| digest | \`${{ steps.build-push.outputs.digest }}\` |" >> "$GITHUB_STEP_SUMMARY"
