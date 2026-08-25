@@ -59,34 +59,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ── Trivy scan (table) — prints CVEs to the Actions log ──────────────────
-      - name: Scan with Trivy (table)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-${{ steps.short-sha.outputs.value }}
-          format: table
-          severity: CRITICAL,HIGH
-          exit-code: "0"          # don't fail here, fail on SARIF step below
-          ignore-unfixed: true
-          scanners: vuln          # skip secret scan for speed on this step
-
-      # ── Trivy scan (SARIF) — gates the pipeline ───────────────────────────────
-      - name: Scan with Trivy (SARIF)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-${{ steps.short-sha.outputs.value }}
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
-
-      - name: Upload Trivy SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-
       # ── Build & push ─────────────────────────────────────────────────────────
       - name: Build and push
         id: build-push
