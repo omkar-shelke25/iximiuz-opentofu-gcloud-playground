@@ -68,7 +68,7 @@ jobs:
 
       # ── Scan ────────────────────────────────────────────────────────────────
       - name: Trivy scan (SARIF)
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: local/scan:${{ github.sha }}
           format: sarif
@@ -84,7 +84,7 @@ jobs:
           category: trivy-image
 
       - name: Trivy scan (fail on critical)
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: local/scan:${{ github.sha }}
           format: table
