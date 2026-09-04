@@ -1,71 +1,106 @@
 # syntax=docker/dockerfile:1
 
-FROM ghcr.io/iximiuz/labs/rootfs:ubuntu-docker
+ARG ROOTFS_IMAGE=ghcr.io/iximiuz/labs/rootfs:archlinux-0f076c61
+
+# ─── Stage 1: toolchain ───────────────────────────────────────────────────────
+# Downloads, verifies and installs OpenTofu + the gcloud CLI. Archives,
+# checksums and the SDK component installer never reach the final image.
+FROM ${ROOTFS_IMAGE} AS toolchain
+
+ARG OPENTOFU_VERSION=1.12.6
+ARG GCLOUD_VERSION=583.0.0
+ARG GCLOUD_COMPONENTS="gke-gcloud-auth-plugin kubectl"
+# Optional pin. Take it from the versioned-archives page for GCLOUD_VERSION.
+ARG GCLOUD_SHA256=""
+
+USER root
+ENV HOME=/root
+WORKDIR /tmp/build
+
+# OpenTofu, verified against the release SHA256SUMS.
+RUN <<EOF
+set -eu
+base="https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}"
+curl -fsSL -O "${base}/tofu_${OPENTOFU_VERSION}_linux_amd64.tar.gz"
+curl -fsSL -O "${base}/tofu_${OPENTOFU_VERSION}_SHA256SUMS"
+sha256sum --ignore-missing -c "tofu_${OPENTOFU_VERSION}_SHA256SUMS"
+tar -xzf "tofu_${OPENTOFU_VERSION}_linux_amd64.tar.gz" -C /usr/local/bin tofu
+chmod 0755 /usr/local/bin/tofu
+EOF
+
+# gcloud CLI from the versioned archive. The linux/amd64 archive ships its own
+# Python interpreter, so the final image needs no Python of its own.
+RUN <<EOF
+set -eu
+curl -fsSL -o gcloud.tar.gz \
+  "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-x86_64.tar.gz"
+if [ -n "${GCLOUD_SHA256}" ]; then
+  echo "${GCLOUD_SHA256}  gcloud.tar.gz" | sha256sum -c -
+fi
+tar -xzf gcloud.tar.gz -C /opt
+/opt/google-cloud-sdk/install.sh \
+  --quiet \
+  --usage-reporting=false \
+  --path-update=false \
+  --command-completion=false \
+  --additional-components ${GCLOUD_COMPONENTS}
+rm -rf /opt/google-cloud-sdk/.install/.backup
+find /opt/google-cloud-sdk -type d -name __pycache__ -prune -exec rm -rf {} +
+EOF
+
+# ─── Stage 2: playground rootfs ───────────────────────────────────────────────
+FROM ${ROOTFS_IMAGE}
 
 ARG LAB_USER=laborant
 
-# ── System dependencies ───────────────────────────────────────────────────────
 USER root
 ENV HOME=/root
 
-RUN apt-get update && apt-get install -y \
-        apt-transport-https \
-        ca-certificates \
-        curl \
-        gnupg \
-        git \
-        jq \
-        unzip \
-        python3 \
-        python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=toolchain /usr/local/bin/tofu /usr/local/bin/tofu
+COPY --from=toolchain /opt/google-cloud-sdk /opt/google-cloud-sdk
 
-# ── OpenTofu repository + install ─────────────────────────────────────────────
-RUN install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://get.opentofu.org/opentofu.gpg \
-        | tee /etc/apt/keyrings/opentofu.gpg >/dev/null \
-    && curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey \
-        | gpg --no-tty --batch --dearmor -o /etc/apt/keyrings/opentofu-repo.gpg >/dev/null \
-    && chmod a+r /etc/apt/keyrings/opentofu.gpg /etc/apt/keyrings/opentofu-repo.gpg \
-    && echo \
-        "deb [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main\ndeb-src [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" \
-        | tee /etc/apt/sources.list.d/opentofu.list >/dev/null \
-    && chmod a+r /etc/apt/sources.list.d/opentofu.list \
-    && apt-get update \
-    && apt-get install -y tofu \
-    && rm -rf /var/lib/apt/lists/*
+RUN <<EOF
+set -eu
+for bin in gcloud gsutil bq kubectl gke-gcloud-auth-plugin; do
+  if [ -x "/opt/google-cloud-sdk/bin/${bin}" ]; then
+    ln -sf "/opt/google-cloud-sdk/bin/${bin}" "/usr/local/bin/${bin}"
+  fi
+done
+EOF
 
-# ── Google Cloud CLI repository + install ────────────────────────────────────
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-        | tee /etc/apt/sources.list.d/google-cloud-sdk.list >/dev/null \
-    && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-        | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
-    && apt-get update \
-    && apt-get install -y \
-        google-cloud-cli \
-        google-cloud-cli-gke-gcloud-auth-plugin \
-    && rm -rf /var/lib/apt/lists/*
+# ─── Login shell env, shared by root and $LAB_USER ────────────────────────────
+RUN <<EOF
+set -eu
+cat > /etc/profile.d/opentofu-gcloud.sh <<'PROFILE'
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
-# ── Smoke test ────────────────────────────────────────────────────────────────
-RUN tofu version \
-    && gcloud version \
-    && gke-gcloud-auth-plugin --version
+if [ -n "${BASH_VERSION:-}" ]; then
+  if [ -f /opt/google-cloud-sdk/completion.bash.inc ]; then
+    . /opt/google-cloud-sdk/completion.bash.inc
+  fi
+  complete -C /usr/local/bin/tofu tofu
+fi
+PROFILE
+chmod 0755 /etc/profile.d/opentofu-gcloud.sh
+printf '\n. /etc/profile.d/opentofu-gcloud.sh\n' >> /root/.bashrc
+EOF
 
-# ── Login shell env ───────────────────────────────────────────────────────────
-RUN printf 'export USE_GKE_GCLOUD_AUTH_PLUGIN=True\n' > /etc/profile.d/gcloud.sh \
-    && chmod +x /etc/profile.d/gcloud.sh
+# ─── Smoke test ───────────────────────────────────────────────────────────────
+RUN <<EOF
+set -eu
+tofu version
+gcloud version
+kubectl version --client
+gke-gcloud-auth-plugin --version
+EOF
 
-RUN printf '\nsource /etc/profile.d/gcloud.sh\n' >> /root/.bashrc
-
-# ── Lab user shell env ────────────────────────────────────────────────────────
+# ─── Lab user ─────────────────────────────────────────────────────────────────
 USER $LAB_USER
 ENV HOME=/home/$LAB_USER
 
-RUN printf '\nsource /etc/profile.d/gcloud.sh\n' >> "$HOME/.bashrc"
+RUN printf '\n. /etc/profile.d/opentofu-gcloud.sh\n' >> "$HOME/.bashrc"
 
-# ── VS Code extensions ────────────────────────────────────────────────────────
 RUN code-server --install-extension hashicorp.terraform \
     && code-server --install-extension googlecloudtools.cloudcode
 
-# ── Welcome ───────────────────────────────────────────────────────────────────
-COPY welcome $HOME/.welcome
+COPY --chown=$LAB_USER:$LAB_USER welcome $HOME/.welcome
