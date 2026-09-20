@@ -1,0 +1,147 @@
+kind: playground
+name: opentofu-playground-650ec63d
+base: flexbox
+title: OpenTofu with Google Cloud CLI Playground
+description: A disposable OpenTofu development environment with the gcloud SDK, tofu, kubectl, and the GKE auth plugin pre-installed.
+cover: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/opentofu.svg
+categories:
+  - programming
+markdown: |-
+  A disposable OpenTofu development environment with the gcloud SDK, OpenTofu CLI, kubectl, and the GKE auth plugin pre-installed. Full IDE support via VS Code. Runs on 4 vCPU / 10 GiB RAM / 100 GiB disk.
+
+  ## What's included
+
+  - `tofu`: OpenTofu CLI 1.12.6
+  - `gcloud` / `gsutil` / `bq`: Google Cloud SDK 585.0.0
+  - `kubectl`: Kubernetes CLI
+  - `gke-gcloud-auth-plugin`: GKE cluster auth
+  - `k9s` / `kubectx` / `kubens`: cluster UI and context switching
+  - `lazygit`: Git in a terminal UI
+  - `jq` / `yq`: JSON and YAML processing
+  - zsh with a Catppuccin starship prompt that shows the git branch, tofu workspace, GCP project and kube context, plus autosuggestions, syntax highlighting and atuin history search
+
+  ## Key commands
+
+  ### New project
+  ```bash
+  mkdir my-infra && cd my-infra
+  tofu init
+  ```
+
+  ### Plan and apply
+  ```bash
+  tofu plan
+  tofu apply
+  tofu apply -auto-approve
+  ```
+
+  ### Destroy
+  ```bash
+  tofu destroy
+  tofu destroy -auto-approve
+  ```
+
+  ### Format and validate
+  ```bash
+  tofu fmt
+  tofu fmt -check
+  tofu validate
+  ```
+
+  ### State management
+  ```bash
+  tofu state list
+  tofu state show <resource>
+  tofu state rm <resource>
+  tofu import <resource> <id>
+  ```
+
+  ### Workspaces
+  ```bash
+  tofu workspace list
+  tofu workspace new dev
+  tofu workspace select dev
+  ```
+
+  ### gcloud auth
+  ```bash
+  gcloud auth login --no-launch-browser
+  gcloud auth application-default login --no-launch-browser
+  gcloud config set project PROJECT_ID
+  ```
+
+  ### GKE access
+  ```bash
+  gcloud container clusters get-credentials CLUSTER --location LOCATION
+  kubectl get nodes
+  ```
+
+  ### Terminal shortcuts
+  ```bash
+  k get pods      # kubectl
+  tf plan         # tofu
+  ll              # detailed file listing
+  z my-infra      # jump to a recent directory
+  lg              # lazygit
+  icons on        # Nerd Font icons, if your own terminal has the font
+  ```
+
+  `Ctrl+R` searches history, `Ctrl+T` picks a file, `Alt+C` jumps into a subdirectory.
+playground:
+  networks:
+    - name: local
+      subnet: 172.16.0.0/24
+  machines:
+    - name: opentofu-01
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      drives:
+        - source: oci://ghcr.io/omkar-shelke25/opentofu-gcloud-playground@sha256:REPLACE_WITH_DIGEST
+          mount: /
+          size: 100GiB
+      network:
+        interfaces:
+          - network: local
+      resources:
+        cpuCount: 4
+        ramSize: 10GiB
+  tabs:
+    - id: ide-opentofu-01
+      kind: ide
+      name: IDE
+      machine: opentofu-01
+      enabled: true
+    - id: terminal-opentofu-01
+      kind: terminal
+      name: Term
+      machine: opentofu-01
+      enabled: true
+    - id: opentofu-docs
+      kind: web-page
+      name: OpenTofu Docs
+      machine: opentofu-01
+      url: https://opentofu.org/docs/
+      enabled: true
+    - id: registry-docs
+      kind: web-page
+      name: Google Registry
+      machine: opentofu-01
+      url: https://search.opentofu.org/provider/hashicorp/google/latest/docs/guides/getting_started
+      enabled: true
+  initTasks:
+    init_verify_tools:
+      name: init_verify_tools
+      machine: opentofu-01
+      init: true
+      user: laborant
+      timeout_seconds: 60
+      run: tofu version && gcloud version && kubectl version --client && gke-gcloud-auth-plugin --version
+  accessControl:
+    canList:
+      - anyone
+    canRead:
+      - anyone
+    canStart:
+      - anyone
