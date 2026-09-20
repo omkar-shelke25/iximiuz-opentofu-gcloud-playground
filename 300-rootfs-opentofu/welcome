@@ -1,55 +1,70 @@
-Welcome to the OpenTofu + Google Cloud CLI Playground!
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ╭──────────────────────────────────────────────────────────╮
+  │        OpenTofu + Google Cloud CLI Playground            │
+  │        Write, plan and apply GCP infrastructure          │
+  ╰──────────────────────────────────────────────────────────╯
 
- Tools installed:
-   tofu        OpenTofu (open-source Terraform fork)
-   gcloud      Google Cloud CLI
-   gsutil      Google Cloud Storage tool
-   bq          BigQuery CLI
-   gke-gcloud-auth-plugin   GKE cluster auth
+  TOOLCHAIN
+  ─────────
+    tofu                     OpenTofu, open-source Terraform
+    gcloud  gsutil  bq       Google Cloud CLI suite
+    kubectl                  Kubernetes CLI
+    gke-gcloud-auth-plugin   GKE cluster authentication
+    k9s                      Kubernetes terminal UI
+    kubectx  kubens          Switch contexts and namespaces
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TERMINAL
+  ────────
+    The prompt shows your git branch, tofu workspace,
+    kube context and active GCP project as they change.
 
- Quick start:
+    k    = kubectl            tf   = tofu
+    ll   = detailed listing   lt   = tree view
+    z    = jump to a recent directory, e.g. z infra
+    bat  = view files with syntax highlighting
+    rg   = fast text search   fd   = fast file search
+    Ctrl+R  search history    Ctrl+T  pick a file
 
-   tofu version
-   gcloud version
+  1. SIGN IN TO GOOGLE CLOUD
+  ──────────────────────────
+    gcloud auth login --no-launch-browser
+    gcloud auth application-default login --no-launch-browser
+    gcloud config set project PROJECT_ID
 
- Authenticate with Google Cloud:
+    The first login is for gcloud commands.
+    The second one is what OpenTofu uses.
 
-   gcloud auth login
-   gcloud auth application-default login
-   gcloud config set project PROJECT_ID
+  2. FIRST OPENTOFU CONFIG
+  ────────────────────────
+    mkdir my-infra && cd my-infra
 
- Connect to a GKE cluster:
+    cat > main.tf <<'EOF'
+    terraform {
+      required_providers {
+        google = {
+          source  = "hashicorp/google"
+          version = "~> 8.0"
+        }
+      }
+    }
 
-   gcloud container clusters get-credentials CLUSTER --zone ZONE
+    provider "google" {
+      project = "PROJECT_ID"
+      region  = "us-central1"
+    }
+    EOF
 
- First OpenTofu config:
+    tofu init
+    tofu plan
 
-   mkdir my-infra && cd my-infra
-   cat > main.tf <<'EOF'
-   terraform {
-     required_providers {
-       google = {
-         source  = "registry.opentofu.org/hashicorp/google"
-         version = "~> 5.0"
-       }
-     }
-   }
-   provider "google" {
-     project = "YOUR_PROJECT_ID"
-     region  = "us-central1"
-   }
-   EOF
-   tofu init
-   tofu plan
+  3. CONNECT TO A GKE CLUSTER
+  ───────────────────────────
+    gcloud container clusters get-credentials CLUSTER \
+      --location LOCATION
+    kubectl get nodes
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
- Docs:
-   OpenTofu   →  https://opentofu.org/docs/
-   GCloud     →  https://cloud.google.com/sdk/docs
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DOCS
+  ────
+    OpenTofu   https://opentofu.org/docs/
+    gcloud     https://docs.cloud.google.com/sdk/docs
+    Provider   https://search.opentofu.org/provider/hashicorp/google
