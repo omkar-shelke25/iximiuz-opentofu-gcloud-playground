@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG ROOTFS_IMAGE=ghcr.io/iximiuz/labs/rootfs:archlinux-0f076c61
+
 # ─── Stage 1: toolchain ───────────────────────────────────────────────────────
 # Downloads, verifies and installs OpenTofu + the gcloud CLI. Archives,
 # checksums and the SDK component installer never reach the final image.
@@ -112,7 +113,7 @@ format = """
 $os\
 $hostname\
 [\ue0b0](bg:peach fg:red)\
-$directory\
+${env_var.PWD}\
 [\ue0b0](bg:yellow fg:peach)\
 $git_branch\
 $git_status\
@@ -173,13 +174,10 @@ ssh_only = false
 style = "bg:red fg:crust"
 format = "[$hostname ]($style)"
 
-[directory]
+[env_var.PWD]
+variable = "PWD"
 style = "bg:peach fg:crust"
-format = "[ \uf07c $path ]($style)[$read_only]($read_only_style)"
-read_only = "\uf023 "
-read_only_style = "bg:peach fg:red"
-truncation_length = 3
-truncation_symbol = "…/"
+format = "[ \uf07c $env_value ]($style)"
 
 [git_branch]
 symbol = "\uf418"
@@ -230,18 +228,17 @@ TOML
 
 cat > /etc/starship-plain.toml <<'TOML'
 add_newline = true
-format = "$hostname$directory$git_branch$git_status$terraform$gcloud$kubernetes$time$cmd_duration$line_break$status$character"
+format = "$hostname${env_var.PWD}$git_branch$git_status$terraform$gcloud$kubernetes$time$cmd_duration$line_break$status$character"
 
 [hostname]
 ssh_only = false
 style = "bg:#f38ba8 fg:#11111b"
 format = "[ $hostname ]($style)"
 
-[directory]
-truncation_length = 3
+[env_var.PWD]
+variable = "PWD"
 style = "bg:#fab387 fg:#11111b"
-format = "[ $path ]($style)[$read_only]($read_only_style)"
-read_only = " ro"
+format = "[ $env_value ]($style)"
 
 [git_branch]
 symbol = "git:"
