@@ -12,18 +12,23 @@
     gke-gcloud-auth-plugin   GKE cluster authentication
     k9s                      Kubernetes terminal UI
     kubectx  kubens          Switch contexts and namespaces
+    lazygit                  Git in a terminal UI (lg)
 
   TERMINAL
   ────────
-    The prompt shows your git branch, tofu workspace,
-    kube context and active GCP project as they change.
+    zsh with a prompt that shows your git branch, tofu
+    workspace, GCP project and kube context as they change.
+    Gray text while typing is a suggestion: press → to accept.
 
     k    = kubectl            tf   = tofu
-    ll   = detailed listing   lt   = tree view
+    ll   = detailed listing   tree = directory tree
+    cat  = colored output     lg   = lazygit
     z    = jump to a recent directory, e.g. z infra
-    bat  = view files with syntax highlighting
     rg   = fast text search   fd   = fast file search
+
     Ctrl+R  search history    Ctrl+T  pick a file
+    Alt+C   jump into a subdirectory
+    icons on   turn on icons (needs a Nerd Font locally)
 
   1. SIGN IN TO GOOGLE CLOUD
   ──────────────────────────
