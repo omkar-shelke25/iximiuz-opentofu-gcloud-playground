@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 
 ARG ROOTFS_IMAGE=ghcr.io/iximiuz/labs/rootfs:archlinux-0f076c61
-
 # ─── Stage 1: toolchain ───────────────────────────────────────────────────────
 # Downloads, verifies and installs OpenTofu + the gcloud CLI. Archives,
 # checksums and the SDK component installer never reach the final image.
